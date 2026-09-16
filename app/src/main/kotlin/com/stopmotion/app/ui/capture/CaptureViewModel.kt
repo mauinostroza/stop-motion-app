@@ -110,7 +110,7 @@ class CaptureViewModel : ViewModel() {
         val imageCaptureBuilder = ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
             .setTargetRotation(
-                ContextCompat.getSystemService<WindowManager>(context)
+                ContextCompat.getSystemService(context, WindowManager::class.java)
                     ?.defaultDisplay?.rotation ?: Surface.ROTATION_0
             )
         val imageCapture = imageCaptureBuilder.build()
