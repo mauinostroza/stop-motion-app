@@ -5,6 +5,8 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
+import android.view.Surface
+import android.view.WindowManager
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -107,7 +109,10 @@ class CaptureViewModel : ViewModel() {
 
         val imageCaptureBuilder = ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-            .setTargetRotation(context.display?.rotation ?: 0)
+            .setTargetRotation(
+                ContextCompat.getSystemService<WindowManager>(context)
+                    ?.defaultDisplay?.rotation ?: Surface.ROTATION_0
+            )
         val imageCapture = imageCaptureBuilder.build()
         this@CaptureViewModel.imageCapture = imageCapture
 
