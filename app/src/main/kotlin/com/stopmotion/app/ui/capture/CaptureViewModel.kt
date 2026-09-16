@@ -94,18 +94,12 @@ class CaptureViewModel : ViewModel() {
     suspend fun bindCamera(
         context: Context,
         lifecycleOwner: LifecycleOwner,
-        surfaceProvider: PreviewView.SurfaceProvider,
+        surfaceProvider: Preview.SurfaceProvider,
     ): Boolean = withContext(Dispatchers.Main) {
         val cameraProvider = awaitCameraProvider(context) ?: return@withContext false
 
         // Unbind any prior use cases before re-binding.
         cameraProvider.unbindAll()
-
-        val rotation = surfaceProvider.let {
-            // Use display rotation as target for the encoder/preview.
-            // PreviewView exposes this via getDisplay() but we keep it simple.
-            0
-        }
 
         val preview = Preview.Builder()
             .build()

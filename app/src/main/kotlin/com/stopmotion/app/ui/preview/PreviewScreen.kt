@@ -40,7 +40,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -225,8 +226,8 @@ fun PreviewScreen(
                         val top = (dstH - drawH) / 2f
                         drawImage(
                             image = current.asImageBitmap(),
-                            topLeft = androidx.compose.ui.geometry.Offset(left, top),
-                            size = Size(drawW, drawH),
+                            dstOffset = IntOffset(left.toInt(), top.toInt()),
+                            dstSize = IntSize(drawW.toInt(), drawH.toInt()),
                         )
                     }
                 }
