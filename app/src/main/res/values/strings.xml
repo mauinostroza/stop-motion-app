@@ -1,0 +1,57 @@
+<resources>
+    <string name="app_name">StopMotion</string>
+
+    <!-- Home -->
+    <string name="home_welcome">Crea videos stop motion fácilmente</string>
+    <string name="home_subtitle">Toma fotos o elige imágenes de tu galería y conviértelas en video</string>
+    <string name="home_new_project">Nuevo proyecto</string>
+
+    <!-- Capture -->
+    <string name="capture_take_photo">Tomar foto</string>
+    <string name="capture_gallery">Galería</string>
+    <string name="capture_done">Listo</string>
+    <string name="capture_grid">Cuadrícula</string>
+    <string name="capture_onion_skin">Onion skin</string>
+    <string name="capture_flip_camera">Voltear cámara</string>
+    <string name="capture_frames_count">%1$d fotos</string>
+    <string name="capture_permission_rationale">Se necesita permiso de cámara para tomar fotos</string>
+    <string name="capture_permission_grant">Conceder permiso</string>
+
+    <!-- Frames -->
+    <string name="frames_title">Tus fotos</string>
+    <string name="frames_empty">Aún no has agregado fotos</string>
+    <string name="frames_add_camera">Agregar desde cámara</string>
+    <string name="frames_add_gallery">Agregar desde galería</string>
+    <string name="frames_preview">Preview</string>
+    <string name="frames_export">Exportar</string>
+    <string name="frames_delete">Eliminar</string>
+    <string name="frames_reorder">Reordenar</string>
+    <string name="frames_delete_confirmation">¿Eliminar esta foto?</string>
+    <string name="frames_delete_all_confirmation">¿Eliminar todas las fotos?</string>
+    <string name="frames_cancel">Cancelar</string>
+    <string name="frames_delete_all">Eliminar todo</string>
+
+    <!-- Preview -->
+    <string name="preview_title">Preview de animación</string>
+    <string name="preview_play">Reproducir</string>
+    <string name="preview_pause">Pausar</string>
+    <string name="preview_fps_label">FPS: %1$d</string>
+
+    <!-- Export -->
+    <string name="export_title">Exportar video</string>
+    <string name="export_resolution">Resolución</string>
+    <string name="export_fps">FPS</string>
+    <string name="export_quality">Calidad</string>
+    <string name="export_start">Crear video</string>
+    <string name="export_creating">Creando video…</string>
+    <string name="export_progress">Progreso: %1$d%%</string>
+    <string name="export_success">Video creado correctamente</string>
+    <string name="export_share">Compartir</string>
+    <string name="export_save_gallery">Guardar en galería</string>
+    <string name="export_error">Error al crear el video</string>
+
+    <!-- Common -->
+    <string name="ok">OK</string>
+    <string name="cancel">Cancelar</string>
+    <string name="back">Volver</string>
+</resources>

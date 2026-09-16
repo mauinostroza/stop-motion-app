@@ -1,0 +1,36 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Film strip / play icon -->
+    <group android:scaleX="0.55" android:scaleY="0.55"
+        android:pivotX="54" android:pivotY="54">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M54,30 L74,54 L54,78 L34,54 Z" />
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="3"
+            android:pathData="M28,30 L80,30 L80,78 L28,78 Z M28,30 L28,78 M80,30 L80,78" />
+        <!-- Frame markers -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M28,38 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M28,54 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M28,70 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M80,38 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M80,54 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M80,70 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+    </group>
+</vector>
