@@ -12,6 +12,13 @@ un video MP4.
   semitransparente sobre el preview para facilitar la animación cuadro
   a cuadro.
 - **Cuadrícula (grid)** de 3x3 conmutable para mejor composición.
+- **Captura automática (intervalómetro)**: dispara fotos sin intervención
+  cada N segundos (1–60 s, configurable con un stepper +/-, por defecto
+  3 s). Muestra un anillo de cuenta regresiva alrededor del botón de
+  disparo y el texto "Próxima foto en Xs". Se detiene automáticamente
+  ante un error de cámara o pérdida de permiso, y se pausa/reanuda con
+  el ciclo de vida de la pantalla. El último intervalo elegido se
+  recuerda entre sesiones (el modo en sí siempre arranca apagado).
 - **Selector desde galería** moderno con Photo Picker (multi-selección).
 - **Reordenar / eliminar** frames antes de exportar.
 - **Preview animado** con slider de FPS en vivo (1–30).
@@ -145,7 +152,6 @@ carpeta relativa `Movies/StopMotion`, sin necesidad de permisos
 - Añadir audio / música de fondo al MP4 (mux track de audio AAC).
 - Migrar la persistencia local actual a Room al incorporar múltiples proyectos.
 - Soporte para orientación landscape de la cámara.
-- Tempbral/intervalómetro para captura automática cada N segundos.
 - Filtros LUT / Look-Up Table para estilo cinematográfico.
 - Modo "loop" (boomerang) en la exportación.
 

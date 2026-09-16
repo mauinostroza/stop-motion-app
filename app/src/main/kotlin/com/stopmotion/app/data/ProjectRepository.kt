@@ -60,6 +60,13 @@ class ProjectRepository(private val context: Context) {
         saveProject()
     }
 
+    @Synchronized
+    fun setIntervalSeconds(seconds: Int) {
+        require(seconds in MIN_INTERVAL_SECONDS..MAX_INTERVAL_SECONDS) { "Interval must be in $MIN_INTERVAL_SECONDS..$MAX_INTERVAL_SECONDS, was $seconds" }
+        _project.intervalSeconds = seconds
+        saveProject()
+    }
+
     /**
      * Creates a new capture file inside [capturesDir]. The filename is
      * timestamped to ensure chronological order during sorting.
@@ -199,12 +206,15 @@ class ProjectRepository(private val context: Context) {
         val resolution = preferences.getString(KEY_RESOLUTION, ExportResolution.P720.name)
             ?.let { runCatching { ExportResolution.valueOf(it) }.getOrNull() }
             ?: ExportResolution.P720
+        val intervalSeconds = preferences.getInt(KEY_INTERVAL_SECONDS, DEFAULT_INTERVAL_SECONDS)
+            .coerceIn(MIN_INTERVAL_SECONDS, MAX_INTERVAL_SECONDS)
         return Project(
             id = preferences.getString(KEY_PROJECT_ID, UUID.randomUUID().toString())!!,
             frames = frames,
             frameRateFps = fps,
             resolution = resolution,
             createdAt = preferences.getLong(KEY_CREATED_AT, System.currentTimeMillis()),
+            intervalSeconds = intervalSeconds,
         )
     }
 
@@ -225,6 +235,7 @@ class ProjectRepository(private val context: Context) {
             .putInt(KEY_FPS, _project.frameRateFps)
             .putString(KEY_RESOLUTION, _project.resolution.name)
             .putString(KEY_FRAMES, array.toString())
+            .putInt(KEY_INTERVAL_SECONDS, _project.intervalSeconds)
             .apply()
     }
 
@@ -235,5 +246,9 @@ class ProjectRepository(private val context: Context) {
         private const val KEY_FPS = "fps"
         private const val KEY_RESOLUTION = "resolution"
         private const val KEY_FRAMES = "frames"
+        private const val KEY_INTERVAL_SECONDS = "interval_seconds"
+        const val MIN_INTERVAL_SECONDS = 1
+        const val MAX_INTERVAL_SECONDS = 60
+        const val DEFAULT_INTERVAL_SECONDS = 3
     }
 }
