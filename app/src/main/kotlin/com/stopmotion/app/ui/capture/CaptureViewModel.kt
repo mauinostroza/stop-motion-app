@@ -63,14 +63,26 @@ class CaptureViewModel : ViewModel() {
     private val _onionSkinEnabled = MutableStateFlow(true)
     val onionSkinEnabled: StateFlow<Boolean> = _onionSkinEnabled.asStateFlow()
 
+    private val _autoCaptureEnabled = MutableStateFlow(false)
+    val autoCaptureEnabled: StateFlow<Boolean> = _autoCaptureEnabled.asStateFlow()
+
+    private val _intervalSeconds = MutableStateFlow(ProjectRepository.DEFAULT_INTERVAL_SECONDS)
+    val intervalSeconds: StateFlow<Int> = _intervalSeconds.asStateFlow()
+
     /** The CameraX ImageCapture use case — configured by [bindCamera]. */
     var imageCapture: ImageCapture? = null
         private set
+
+    private var initialized = false
 
     fun init(repo: ProjectRepository) {
         this.repo = repo
         this.captureDir = repo.capturesDir
         _frameCount.value = repo.frameCount()
+        if (!initialized) {
+            _intervalSeconds.value = repo.snapshot().intervalSeconds
+            initialized = true
+        }
     }
 
     fun toggleGrid() {
@@ -79,6 +91,30 @@ class CaptureViewModel : ViewModel() {
 
     fun toggleOnionSkin() {
         _onionSkinEnabled.value = !_onionSkinEnabled.value
+    }
+
+    fun toggleAutoCapture() {
+        _autoCaptureEnabled.value = !_autoCaptureEnabled.value
+        if (_autoCaptureEnabled.value) {
+            _lastError.value = null
+        } else {
+            repo?.setIntervalSeconds(_intervalSeconds.value)
+        }
+    }
+
+    fun stopAutoCapture() {
+        _autoCaptureEnabled.value = false
+    }
+
+    fun setIntervalSeconds(seconds: Int) {
+        _intervalSeconds.value = seconds.coerceIn(
+            ProjectRepository.MIN_INTERVAL_SECONDS,
+            ProjectRepository.MAX_INTERVAL_SECONDS,
+        )
+    }
+
+    fun consumeError() {
+        _lastError.value = null
     }
 
     fun flipCamera() {
@@ -131,6 +167,7 @@ class CaptureViewModel : ViewModel() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to bind camera", e)
             _lastError.value = e.localizedMessage ?: "Camera binding failed"
+            stopAutoCapture()
             false
         }
     }
@@ -174,6 +211,7 @@ class CaptureViewModel : ViewModel() {
                     Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
                     _lastError.value = exc.localizedMessage ?: "Capture failed"
                     _capturing.value = false
+                    stopAutoCapture()
                 }
             },
         )

@@ -10,6 +10,7 @@ package com.stopmotion.app.data
  *                          duration override is set.
  * @property resolution    Selected resolution for export.
  * @property createdAt     Epoch millis when the project was created.
+ * @property intervalSeconds Intervalo en segundos entre disparos del modo de captura automática.
  */
 data class Project(
     val id: String,
@@ -17,4 +18,5 @@ data class Project(
     var frameRateFps: Int = 12,
     var resolution: ExportResolution = ExportResolution.P720,
     val createdAt: Long = System.currentTimeMillis(),
+    var intervalSeconds: Int = 3,
 )

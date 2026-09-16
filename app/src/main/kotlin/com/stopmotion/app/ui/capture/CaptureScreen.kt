@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,9 +20,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Cameraswitch
@@ -29,6 +32,10 @@ import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.GridOff
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LayersClear
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.TimerOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -41,6 +48,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
@@ -48,7 +56,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -57,9 +67,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.stopmotion.app.R
 import com.stopmotion.app.data.ServiceLocator
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.drawscope.Stroke
 
@@ -108,8 +123,24 @@ fun CaptureScreen(
     val onionEnabled by vm.onionSkinEnabled.collectAsState()
     val gridEnabled by vm.gridEnabled.collectAsState()
     val lensFacing by vm.lensFacing.collectAsState()
+    val autoCaptureEnabled by vm.autoCaptureEnabled.collectAsState()
+    val intervalSeconds by vm.intervalSeconds.collectAsState()
+    val lastError by vm.lastError.collectAsState()
 
     val previewView = remember { PreviewView(context) }
+
+    var remainingMs by remember { mutableLongStateOf(0L) }
+
+    // Keep the screen on while the intervalometer is running.
+    val activity = context as? android.app.Activity
+    DisposableEffect(autoCaptureEnabled) {
+        if (autoCaptureEnabled) {
+            activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -140,6 +171,37 @@ fun CaptureScreen(
                     )
                 }
 
+                // Intervalometer loop: fires takePhoto() every intervalSeconds while
+                // autoCaptureEnabled is true. Cancelled automatically if this branch
+                // stops being composed (e.g. camera permission lost).
+                LaunchedEffect(autoCaptureEnabled, intervalSeconds) {
+                    if (!autoCaptureEnabled) {
+                        remainingMs = 0L
+                        return@LaunchedEffect
+                    }
+                    lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                        val totalMs = intervalSeconds * 1000L
+                        while (isActive) {
+                            val deadline = android.os.SystemClock.elapsedRealtime() + totalMs
+                            while (true) {
+                                val left = deadline - android.os.SystemClock.elapsedRealtime()
+                                if (left <= 0L) break
+                                remainingMs = left
+                                delay(minOf(left, 50L))
+                            }
+                            remainingMs = 0L
+
+                            if (!vm.hasCameraPermission(context) || vm.imageCapture == null) {
+                                vm.stopAutoCapture()
+                                break
+                            }
+
+                            vm.takePhoto(context)
+                            vm.capturing.first { !it }
+                        }
+                    }
+                }
+
                 // Onion skin overlay
                 if (onionEnabled && onionBitmap != null) {
                     ImageWithAlpha(
@@ -154,24 +216,34 @@ fun CaptureScreen(
                     GridOverlay(modifier = Modifier.fillMaxSize())
                 }
 
-                // Top controls (grid toggle, onion toggle, flip camera)
+                // Top controls (grid toggle, onion toggle, flip camera, auto capture toggle)
                 CaptureTopControls(
                     gridEnabled = gridEnabled,
                     onionEnabled = onionEnabled,
+                    autoEnabled = autoCaptureEnabled,
                     onToggleGrid = vm::toggleGrid,
                     onToggleOnion = vm::toggleOnionSkin,
                     onFlipCamera = vm::flipCamera,
+                    onToggleAuto = vm::toggleAutoCapture,
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.TopCenter)
                         .padding(16.dp),
                 )
 
-                // Bottom: frame count + capture button + Done button
+                // Bottom: interval selector + frame count + capture button + Done button
                 CaptureBottomBar(
                     frameCount = frameCount,
                     capturing = capturing,
+                    autoEnabled = autoCaptureEnabled,
+                    intervalSeconds = intervalSeconds,
+                    onIntervalChange = vm::setIntervalSeconds,
+                    countdownProgress = {
+                        if (intervalSeconds > 0) 1f - (remainingMs.toFloat() / (intervalSeconds * 1000f)) else 0f
+                    },
+                    secondsLeft = kotlin.math.ceil(remainingMs / 1000f).toInt(),
                     onTakePhoto = { vm.takePhoto(context) },
+                    onToggleAuto = vm::toggleAutoCapture,
                     onDone = onDone,
                     onCancel = onCancel,
                     modifier = Modifier
@@ -179,6 +251,29 @@ fun CaptureScreen(
                         .align(Alignment.BottomCenter)
                         .padding(16.dp),
                 )
+
+                // Error banner: shown briefly when auto-capture stops due to a failure.
+                LaunchedEffect(lastError) {
+                    if (lastError != null) {
+                        delay(4000)
+                        vm.consumeError()
+                    }
+                }
+                if (lastError != null) {
+                    Text(
+                        text = stringResource(R.string.capture_auto_error, lastError ?: ""),
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .background(
+                                color = Color.Black.copy(alpha = 0.7f),
+                                shape = RoundedCornerShape(12.dp),
+                            )
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                    )
+                }
             }
         }
     }
@@ -193,9 +288,11 @@ fun CaptureScreen(
 private fun CaptureTopControls(
     gridEnabled: Boolean,
     onionEnabled: Boolean,
+    autoEnabled: Boolean,
     onToggleGrid: () -> Unit,
     onToggleOnion: () -> Unit,
     onFlipCamera: () -> Unit,
+    onToggleAuto: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -247,6 +344,23 @@ private fun CaptureTopControls(
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
             )
         }
+
+        IconButton(
+            onClick = onToggleAuto,
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = if (autoEnabled)
+                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
+                else
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+            ),
+            modifier = Modifier.size(48.dp),
+        ) {
+            Icon(
+                imageVector = if (autoEnabled) Icons.Default.Timer else Icons.Default.TimerOff,
+                contentDescription = stringResource(R.string.capture_auto_mode),
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+        }
     }
 }
 
@@ -254,7 +368,13 @@ private fun CaptureTopControls(
 private fun CaptureBottomBar(
     frameCount: Int,
     capturing: Boolean,
+    autoEnabled: Boolean,
+    intervalSeconds: Int,
+    onIntervalChange: (Int) -> Unit,
+    countdownProgress: () -> Float,
+    secondsLeft: Int,
     onTakePhoto: () -> Unit,
+    onToggleAuto: () -> Unit,
     onDone: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
@@ -264,6 +384,13 @@ private fun CaptureBottomBar(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        AnimatedVisibility(visible = autoEnabled) {
+            IntervalSelector(
+                intervalSeconds = intervalSeconds,
+                onIntervalChange = onIntervalChange,
+            )
+        }
+
         Text(
             text = stringResource(R.string.capture_frames_count, frameCount),
             color = Color.White,
@@ -276,6 +403,21 @@ private fun CaptureBottomBar(
                 )
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         )
+
+        AnimatedVisibility(visible = autoEnabled) {
+            Text(
+                text = stringResource(R.string.capture_next_shot_in, secondsLeft),
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .background(
+                        color = Color.Black.copy(alpha = 0.55f),
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -295,28 +437,48 @@ private fun CaptureBottomBar(
 
             // Capture button
             Box(
-                modifier = Modifier
-                    .size(96.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                        shape = CircleShape,
-                    ),
+                modifier = Modifier.size(108.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                if (capturing) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 3.dp,
-                        modifier = Modifier.size(48.dp),
+                if (autoEnabled && !capturing) {
+                    CountdownRing(
+                        progress = countdownProgress,
+                        modifier = Modifier.fillMaxSize(),
                     )
-                } else {
-                    IconButton(onClick = onTakePhoto) {
-                        Icon(
-                            imageVector = Icons.Default.Camera,
-                            contentDescription = stringResource(R.string.capture_take_photo),
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                }
+                Box(
+                    modifier = Modifier
+                        .size(96.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                            shape = CircleShape,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (capturing) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 3.dp,
                             modifier = Modifier.size(48.dp),
                         )
+                    } else if (autoEnabled) {
+                        IconButton(onClick = onToggleAuto) {
+                            Icon(
+                                imageVector = Icons.Default.Stop,
+                                contentDescription = stringResource(R.string.capture_stop_auto),
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(48.dp),
+                            )
+                        }
+                    } else {
+                        IconButton(onClick = onTakePhoto) {
+                            Icon(
+                                imageVector = Icons.Default.Camera,
+                                contentDescription = stringResource(R.string.capture_take_photo),
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(48.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -333,6 +495,70 @@ private fun CaptureBottomBar(
                     tint = MaterialTheme.colorScheme.onPrimaryContainer)
             }
         }
+    }
+}
+
+@Composable
+private fun IntervalSelector(
+    intervalSeconds: Int,
+    onIntervalChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .background(color = Color.Black.copy(alpha = 0.55f), shape = RoundedCornerShape(12.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(
+            onClick = { onIntervalChange(intervalSeconds - 1) },
+            enabled = intervalSeconds > com.stopmotion.app.data.ProjectRepository.MIN_INTERVAL_SECONDS,
+        ) {
+            Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.capture_interval_decrease), tint = Color.White)
+        }
+        Text(
+            text = stringResource(R.string.capture_interval_label, intervalSeconds),
+            color = Color.White,
+            style = MaterialTheme.typography.labelLarge,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.widthIn(min = 72.dp),
+        )
+        IconButton(
+            onClick = { onIntervalChange(intervalSeconds + 1) },
+            enabled = intervalSeconds < com.stopmotion.app.data.ProjectRepository.MAX_INTERVAL_SECONDS,
+        ) {
+            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.capture_interval_increase), tint = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun CountdownRing(
+    progress: () -> Float,
+    modifier: Modifier = Modifier,
+) {
+    val progressColor = MaterialTheme.colorScheme.tertiary
+    Canvas(modifier = modifier) {
+        val strokeWidth = 4.dp.toPx()
+        val inset = strokeWidth / 2
+        drawArc(
+            color = Color.White.copy(alpha = 0.25f),
+            startAngle = -90f,
+            sweepAngle = 360f,
+            useCenter = false,
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+            topLeft = Offset(inset, inset),
+            size = Size(size.width - strokeWidth, size.height - strokeWidth),
+        )
+        drawArc(
+            color = progressColor,
+            startAngle = -90f,
+            sweepAngle = 360f * progress(),
+            useCenter = false,
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+            topLeft = Offset(inset, inset),
+            size = Size(size.width - strokeWidth, size.height - strokeWidth),
+        )
     }
 }
 

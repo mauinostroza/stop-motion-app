@@ -16,6 +16,13 @@
     <string name="capture_frames_count">%1$d fotos</string>
     <string name="capture_permission_rationale">Se necesita permiso de cámara para tomar fotos</string>
     <string name="capture_permission_grant">Conceder permiso</string>
+    <string name="capture_auto_mode">Captura automática</string>
+    <string name="capture_stop_auto">Detener captura automática</string>
+    <string name="capture_interval_label">Cada %1$d s</string>
+    <string name="capture_interval_increase">Aumentar intervalo</string>
+    <string name="capture_interval_decrease">Reducir intervalo</string>
+    <string name="capture_next_shot_in">Próxima foto en %1$d s</string>
+    <string name="capture_auto_error">Se detuvo la captura automática: %1$s</string>
 
     <!-- Frames -->
     <string name="frames_title">Tus fotos</string>
