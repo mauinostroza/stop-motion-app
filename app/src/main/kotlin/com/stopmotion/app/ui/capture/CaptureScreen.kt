@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.GridOff
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LayersClear
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
@@ -124,6 +125,7 @@ fun CaptureScreen(
     val gridEnabled by vm.gridEnabled.collectAsState()
     val lensFacing by vm.lensFacing.collectAsState()
     val autoCaptureEnabled by vm.autoCaptureEnabled.collectAsState()
+    val autoCaptureRunning by vm.autoCaptureRunning.collectAsState()
     val intervalSeconds by vm.intervalSeconds.collectAsState()
     val lastError by vm.lastError.collectAsState()
 
@@ -133,8 +135,8 @@ fun CaptureScreen(
 
     // Keep the screen on while the intervalometer is running.
     val activity = context as? android.app.Activity
-    DisposableEffect(autoCaptureEnabled) {
-        if (autoCaptureEnabled) {
+    DisposableEffect(autoCaptureRunning) {
+        if (autoCaptureRunning) {
             activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
         onDispose {
@@ -172,10 +174,10 @@ fun CaptureScreen(
                 }
 
                 // Intervalometer loop: fires takePhoto() every intervalSeconds while
-                // autoCaptureEnabled is true. Cancelled automatically if this branch
+                // autoCaptureRunning is true. Cancelled automatically if this branch
                 // stops being composed (e.g. camera permission lost).
-                LaunchedEffect(autoCaptureEnabled, intervalSeconds) {
-                    if (!autoCaptureEnabled) {
+                LaunchedEffect(autoCaptureRunning, intervalSeconds) {
+                    if (!autoCaptureRunning) {
                         remainingMs = 0L
                         return@LaunchedEffect
                     }
@@ -243,7 +245,8 @@ fun CaptureScreen(
                     },
                     secondsLeft = kotlin.math.ceil(remainingMs / 1000f).toInt(),
                     onTakePhoto = { vm.takePhoto(context) },
-                    onToggleAuto = vm::toggleAutoCapture,
+                    autoRunning = autoCaptureRunning,
+                    onToggleAutoRunning = vm::toggleAutoCaptureRunning,
                     onDone = onDone,
                     onCancel = onCancel,
                     modifier = Modifier
@@ -374,7 +377,8 @@ private fun CaptureBottomBar(
     countdownProgress: () -> Float,
     secondsLeft: Int,
     onTakePhoto: () -> Unit,
-    onToggleAuto: () -> Unit,
+    autoRunning: Boolean,
+    onToggleAutoRunning: () -> Unit,
     onDone: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
@@ -404,9 +408,24 @@ private fun CaptureBottomBar(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
-        AnimatedVisibility(visible = autoEnabled) {
+        AnimatedVisibility(visible = autoRunning) {
             Text(
                 text = stringResource(R.string.capture_next_shot_in, secondsLeft),
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .background(
+                        color = Color.Black.copy(alpha = 0.55f),
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+        }
+
+        AnimatedVisibility(visible = autoEnabled && !autoRunning) {
+            Text(
+                text = stringResource(R.string.capture_tap_to_start),
                 color = Color.White,
                 style = MaterialTheme.typography.labelMedium,
                 textAlign = TextAlign.Center,
@@ -440,7 +459,7 @@ private fun CaptureBottomBar(
                 modifier = Modifier.size(108.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                if (autoEnabled && !capturing) {
+                if (autoRunning && !capturing) {
                     CountdownRing(
                         progress = countdownProgress,
                         modifier = Modifier.fillMaxSize(),
@@ -461,11 +480,20 @@ private fun CaptureBottomBar(
                             strokeWidth = 3.dp,
                             modifier = Modifier.size(48.dp),
                         )
-                    } else if (autoEnabled) {
-                        IconButton(onClick = onToggleAuto) {
+                    } else if (autoRunning) {
+                        IconButton(onClick = onToggleAutoRunning) {
                             Icon(
                                 imageVector = Icons.Default.Stop,
                                 contentDescription = stringResource(R.string.capture_stop_auto),
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(48.dp),
+                            )
+                        }
+                    } else if (autoEnabled) {
+                        IconButton(onClick = onToggleAutoRunning) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = stringResource(R.string.capture_start_auto),
                                 tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(48.dp),
                             )

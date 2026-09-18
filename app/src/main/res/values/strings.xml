@@ -23,6 +23,8 @@
     <string name="capture_interval_decrease">Reducir intervalo</string>
     <string name="capture_next_shot_in">Próxima foto en %1$d s</string>
     <string name="capture_auto_error">Se detuvo la captura automática: %1$s</string>
+    <string name="capture_start_auto">Iniciar captura automática</string>
+    <string name="capture_tap_to_start">Toca el obturador para iniciar</string>
 
     <!-- Frames -->
     <string name="frames_title">Tus fotos</string>

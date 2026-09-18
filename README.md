@@ -12,13 +12,16 @@ un video MP4.
   semitransparente sobre el preview para facilitar la animación cuadro
   a cuadro.
 - **Cuadrícula (grid)** de 3x3 conmutable para mejor composición.
-- **Captura automática (intervalómetro)**: dispara fotos sin intervención
-  cada N segundos (1–60 s, configurable con un stepper +/-, por defecto
-  3 s). Muestra un anillo de cuenta regresiva alrededor del botón de
-  disparo y el texto "Próxima foto en Xs". Se detiene automáticamente
-  ante un error de cámara o pérdida de permiso, y se pausa/reanuda con
-  el ciclo de vida de la pantalla. El último intervalo elegido se
-  recuerda entre sesiones (el modo en sí siempre arranca apagado).
+- **Captura automática (intervalómetro)**: se arma con el ícono de reloj
+  (muestra el stepper de intervalo, 1–60 s, por defecto 3 s) y la
+  secuencia arranca recién al tocar el botón de disparo — el mismo botón
+  la detiene. Muestra un anillo de cuenta regresiva y el texto "Próxima
+  foto en Xs". Se detiene automáticamente ante un error de cámara o
+  pérdida de permiso, y se pausa/reanuda con el ciclo de vida de la
+  pantalla. El último intervalo elegido se recuerda entre sesiones (el
+  modo en sí siempre arranca apagado). Cada foto —manual o automática—
+  suena con el clic de obturador del sistema y se guarda tanto en el
+  proyecto como en la galería del dispositivo (`Pictures/StopMotion`).
 - **Selector desde galería** moderno con Photo Picker (multi-selección).
 - **Reordenar / eliminar** frames antes de exportar.
 - **Preview animado** con slider de FPS en vivo (1–30).

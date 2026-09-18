@@ -1,9 +1,13 @@
 package com.stopmotion.app.ui.capture
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.MediaActionSound
+import android.os.Build
+import android.provider.MediaStore
 import android.util.Log
 import android.view.Surface
 import android.view.WindowManager
@@ -26,6 +30,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
@@ -39,6 +44,7 @@ class CaptureViewModel : ViewModel() {
 
     private var repo: ProjectRepository? = null
     private var captureDir: File? = null
+    private val shutterSound = MediaActionSound()
 
     /** Backing image for onion skin overlay (most recent captured frame). */
     private val _onionSkinBitmap = MutableStateFlow<Bitmap?>(null)
@@ -66,6 +72,9 @@ class CaptureViewModel : ViewModel() {
     private val _autoCaptureEnabled = MutableStateFlow(false)
     val autoCaptureEnabled: StateFlow<Boolean> = _autoCaptureEnabled.asStateFlow()
 
+    private val _autoCaptureRunning = MutableStateFlow(false)
+    val autoCaptureRunning: StateFlow<Boolean> = _autoCaptureRunning.asStateFlow()
+
     private val _intervalSeconds = MutableStateFlow(ProjectRepository.DEFAULT_INTERVAL_SECONDS)
     val intervalSeconds: StateFlow<Int> = _intervalSeconds.asStateFlow()
 
@@ -81,6 +90,7 @@ class CaptureViewModel : ViewModel() {
         _frameCount.value = repo.frameCount()
         if (!initialized) {
             _intervalSeconds.value = repo.snapshot().intervalSeconds
+            shutterSound.load(MediaActionSound.SHUTTER_CLICK)
             initialized = true
         }
     }
@@ -94,15 +104,23 @@ class CaptureViewModel : ViewModel() {
     }
 
     fun toggleAutoCapture() {
-        _autoCaptureEnabled.value = !_autoCaptureEnabled.value
-        if (_autoCaptureEnabled.value) {
+        val next = !_autoCaptureEnabled.value
+        _autoCaptureEnabled.value = next
+        if (next) {
             _lastError.value = null
         } else {
+            _autoCaptureRunning.value = false
             repo?.setIntervalSeconds(_intervalSeconds.value)
         }
     }
 
+    fun toggleAutoCaptureRunning() {
+        if (!_autoCaptureEnabled.value) return
+        _autoCaptureRunning.value = !_autoCaptureRunning.value
+    }
+
     fun stopAutoCapture() {
+        _autoCaptureRunning.value = false
         _autoCaptureEnabled.value = false
     }
 
@@ -187,6 +205,7 @@ class CaptureViewModel : ViewModel() {
         val options = ImageCapture.OutputFileOptions.Builder(file).build()
 
         val executor: Executor = ContextCompat.getMainExecutor(context)
+        shutterSound.play(MediaActionSound.SHUTTER_CLICK)
         imageCapture.takePicture(
             options,
             executor,
@@ -194,7 +213,7 @@ class CaptureViewModel : ViewModel() {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     repo.addCapturedFrame(file)
                     _frameCount.value = repo.frameCount()
-                    // Load last bitmap for onion skin (downsampled).
+                    // Load last bitmap for onion skin (downsampled) and copy to the gallery.
                     viewModelScope.launch(Dispatchers.IO) {
                         val bmp = BitmapLoader.loadDownsampled(
                             context = context,
@@ -203,6 +222,7 @@ class CaptureViewModel : ViewModel() {
                             targetMaxDim = 720,
                         )
                         _onionSkinBitmap.value = bmp
+                        saveToGallery(context, file)
                     }
                     _capturing.value = false
                 }
@@ -217,6 +237,41 @@ class CaptureViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Copies a captured frame into the system MediaStore ("Pictures/StopMotion")
+     * so it also shows up in the device's gallery app. The private copy in
+     * [ProjectRepository.capturesDir] remains the source of truth for assembling
+     * the stop motion video.
+     */
+    private fun saveToGallery(context: Context, file: File) {
+        val resolver = context.contentResolver
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, file.name)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/StopMotion")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+        }
+        val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        } else {
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        }
+        val item = resolver.insert(collection, values) ?: return
+        try {
+            file.inputStream().use { input ->
+                resolver.openOutputStream(item)?.use { output -> input.copyTo(output) }
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val finalize = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
+                resolver.update(item, finalize, null, null)
+            }
+        } catch (e: IOException) {
+            Log.e(TAG, "Failed to save photo to gallery", e)
+        }
+    }
+
     private suspend fun awaitCameraProvider(context: Context): ProcessCameraProvider? =
         suspendCoroutine { cont ->
             val future = ProcessCameraProvider.getInstance(context)
@@ -229,6 +284,11 @@ class CaptureViewModel : ViewModel() {
     fun hasCameraPermission(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) ==
                 PackageManager.PERMISSION_GRANTED
+
+    override fun onCleared() {
+        super.onCleared()
+        shutterSound.release()
+    }
 
     companion object {
         private const val TAG = "CaptureViewModel"
